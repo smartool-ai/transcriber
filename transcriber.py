@@ -2,14 +2,19 @@ import enum
 import json
 import os
 from logging import getLogger
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 import boto3
 import botocore
 from openai import OpenAI
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
-from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
+from pynamodb.attributes import (
+    ListAttribute,
+    MapAttribute,
+    UnicodeAttribute,
+    UTCDateTimeAttribute,
+)
 from pynamodb.expressions.condition import Condition
 from pynamodb.models import Model
 
@@ -45,6 +50,19 @@ class BaseModel(Model):
         cls.get_attributes()
 
 
+class TicketModel(MapAttribute):
+    subject = UnicodeAttribute()
+    body = UnicodeAttribute()
+    estimation_points = UnicodeAttribute()
+
+    def to_serializable_dict(self) -> dict:
+        return {
+            "subject": self.subject,
+            "body": self.body,
+            "estimation_points": self.estimation_points,
+        }
+
+
 class TicketModel(BaseModel):
     """
     Model for storing tickets.
@@ -61,41 +79,24 @@ class TicketModel(BaseModel):
         region = os.getenv("AWS_REGION", "us-west-2")
 
     document_id = UnicodeAttribute(hash_key=True)
-    created_datetime = UnicodeAttribute()
-    subject = UnicodeAttribute()
-    body = UnicodeAttribute()
-    estimation_points = UnicodeAttribute()
+    created_datetime = UnicodeAttribute(range_key=True)
+    tickets = ListAttribute(of=TicketModel)
 
     @classmethod
     def initialize(
-        cls,
-        document_id: str,
-        created_datetime: str,
-        subject: str,
-        body: str,
-        estimation_points: str,
+        cls, document_id: str, created_datetime: str, tickets: List[dict]
     ) -> "TicketModel":
         ticket = TicketModel(
-            document_id=document_id,
-            created_datetime=created_datetime,
-            subject=subject,
-            body=body,
-            estimation_points=estimation_points,
+            document_id=document_id, created_datetime=created_datetime, tickets=tickets
         )
 
         return ticket
 
-    def save(
-        self,
-        condition: Optional[Condition] = None
-    ) -> Dict[str, Any]:
+    def save(self, condition: Optional[Condition] = None) -> Dict[str, Any]:
         """Save the ticket to DynamoDB."""
         return super().save(condition)
 
-    def delete(
-        self,
-        condition: Optional[Condition] = None
-    ) -> Dict[str, Any]:
+    def delete(self, condition: Optional[Condition] = None) -> Dict[str, Any]:
         """Delete the ticket from DynamoDB."""
         return super().delete(condition)
 
@@ -106,9 +107,11 @@ class TicketModel(BaseModel):
         return {
             "document_id": self.document_id,
             "created_datetime": self.created_datetime,
-            "subject": self.subject,
-            "body": self.body,
-            "estimation_points": self.estimation_points,
+            "tickets": (
+                [ticket.to_serializable_dict() for ticket in self.tickets]
+                if self.tickets
+                else []
+            ),
         }
 
     def to_json(self) -> str:
@@ -117,6 +120,7 @@ class TicketModel(BaseModel):
 
 class PlatformEnum(str, enum.Enum):
     """Enum for the platform of the ticket."""
+
     JIRA = "JIRA"
     GITHUB = "GITHUB"
     TRELLO = "TRELLO"
@@ -140,7 +144,7 @@ class OpenAIClient(OpenAI):
         prompt: str,
         number_of_tickets: Optional[int] = 10,
         platform: Optional[PlatformEnum] = PlatformEnum.JIRA,
-        **kwargs
+        **kwargs,
     ) -> ChatCompletionMessage:
         ticket_prompt: str = (
             self.ticket_prompt_prefix.format(
@@ -199,7 +203,10 @@ def download_file_from_s3(s3_key) -> Optional[str]:
 
 def modify_keys(data: dict) -> dict:
     if isinstance(data, dict):
-        return {key.lower().replace(" ", ""): modify_keys(value) for key, value in data.items()}
+        return {
+            key.lower().replace(" ", ""): modify_keys(value)
+            for key, value in data.items()
+        }
     elif isinstance(data, list):
         return [modify_keys(item) for item in data]
     else:
@@ -229,9 +236,7 @@ def ticket_generation_handler(event, _):
     try:
         logger.info("Generating tickets from transcript...")
         completion: ChatCompletionMessage = client.create_tickets(
-            prompt=transcript,
-            number_of_tickets=number_of_tickets,
-            platform=platform
+            prompt=transcript, number_of_tickets=number_of_tickets, platform=platform
         )
 
         tickets_dict: dict = json.loads(completion.content)
@@ -241,15 +246,12 @@ def ticket_generation_handler(event, _):
         logger.info(f"Modified tickets: {modified_tickets}")
 
         logger.info("Saving tickets to DynamoDB...")
-        for ticket in modified_tickets.get("tickets", []):
-            ticket_model: TicketModel = TicketModel.initialize(
-                created_datetime=generation_datetime,
-                document_id=document_id,
-                subject=ticket.get("subject"),
-                body=ticket.get("body"),
-                estimation_points=str(ticket.get("estimationpoints")),
-            )
-            ticket_model.save()
+        ticket_model: TicketModel = TicketModel.initialize(
+            created_datetime=generation_datetime,
+            document_id=document_id,
+            tickets=modified_tickets.get("tickets", []),
+        )
+        ticket_model.save()
         logger.info("Tickets saved to DynamoDB")
     except Exception as e:
         logger.error(e)

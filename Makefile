@@ -1,3 +1,20 @@
+lint:
+	make black-lint
+	make flake8-lint
+	make mypy-lint
+
+black-format:
+	poetry run black .
+
+black-lint:
+	poetry run black . --check
+
+flake8-lint:
+	poetry run flake8
+
+mypy-lint:
+	poetry run mypy --no-namespace-packages .
+
 build:
 	sam build
 
