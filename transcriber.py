@@ -1,4 +1,3 @@
-import datetime
 import enum
 import json
 import os
@@ -16,6 +15,7 @@ from pynamodb.models import Model
 
 
 logger = getLogger()
+logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 s3 = boto3.resource("s3", region_name=AWS_REGION)
 bucket = s3.Bucket(os.environ.get("ARTIST_IMAGES_BUCKET", "transcriptions-ai"))
@@ -61,22 +61,23 @@ class TicketModel(BaseModel):
         region = os.getenv("AWS_REGION", "us-west-2")
 
     document_id = UnicodeAttribute(hash_key=True)
-    created_datetime = UnicodeAttribute(range_key=True)
+    created_datetime = UnicodeAttribute()
     subject = UnicodeAttribute()
     body = UnicodeAttribute()
     estimation_points = UnicodeAttribute()
 
     @classmethod
-    async def initialize(
+    def initialize(
         cls,
         document_id: str,
+        created_datetime: str,
         subject: str,
         body: str,
         estimation_points: str,
     ) -> "TicketModel":
         ticket = TicketModel(
             document_id=document_id,
-            created_datetime=datetime.datetime.now(),
+            created_datetime=created_datetime,
             subject=subject,
             body=body,
             estimation_points=estimation_points,
@@ -84,24 +85,24 @@ class TicketModel(BaseModel):
 
         return ticket
 
-    async def save(
+    def save(
         self,
         condition: Optional[Condition] = None
     ) -> Dict[str, Any]:
         """Save the ticket to DynamoDB."""
         return super().save(condition)
 
-    async def delete(
+    def delete(
         self,
         condition: Optional[Condition] = None
     ) -> Dict[str, Any]:
         """Delete the ticket from DynamoDB."""
         return super().delete(condition)
 
-    async def __eq__(self, __value: object) -> bool:
+    def __eq__(self, __value: object) -> bool:
         return super().__eq__(__value)
 
-    async def to_serializable_dict(self) -> dict:
+    def to_serializable_dict(self) -> dict:
         return {
             "document_id": self.document_id,
             "created_datetime": self.created_datetime,
@@ -110,16 +111,16 @@ class TicketModel(BaseModel):
             "estimation_points": self.estimation_points,
         }
 
-    async def to_json(self) -> str:
-        return json.dumps(await self.to_serializable_dict())
+    def to_json(self) -> str:
+        return json.dumps(self.to_serializable_dict())
 
 
 class PlatformEnum(str, enum.Enum):
     """Enum for the platform of the ticket."""
-    JIRA = "Jira"
-    GITHUB = "GitHub"
-    TRELLO = "Trello"
-    ASANA = "Asana"  # Add more platforms as needed
+    JIRA = "JIRA"
+    GITHUB = "GITHUB"
+    TRELLO = "TRELLO"
+    ASANA = "ASANA"  # Add more platforms as needed
 
 
 class OpenAIClient(OpenAI):
@@ -171,15 +172,28 @@ def download_file_from_s3(s3_key) -> Optional[str]:
         str: The contents of the file
     """
     try:
-        obj = s3.Object(bucket.name, s3_key)
         logger.info("Loading file...")
+        obj = s3.Object(bucket.name, s3_key)
         obj.load()
         logger.info("File loaded")
-        return obj.get()["Body"].read().decode("utf-8")
+        document = obj.get()
+        logger.debug(f"Document: {document}")
+        document_read = document["Body"].read()
+        logger.debug(f"Document read: {document_read}")
+        document_decoded: str = document_read.decode("utf-8")
+        logger.debug(f"Document decoded: {document_decoded}")
+
+        if not document_decoded:
+            logger.error(f"The file {s3_key} is empty.")
+            return None
+
+        return document_decoded
     except botocore.exceptions.ClientError as e:
         if e.response["Error"]["Code"] == "404":
+            logger.error(f"The object {s3_key} does not exist.")
             return None
         else:
+            logger.error(f"An error occurred while loading the file: {e}")
             raise
 
 
@@ -192,16 +206,21 @@ def modify_keys(data: dict) -> dict:
         return data
 
 
-def ticket_generation_handler(event, context):
+def ticket_generation_handler(event, _):
     """Lambda handler for generating tickets from a transcript"""
+    logger.info("Received event: " + json.dumps(event, indent=2))
     document_id: str = event.get("document_id")
     number_of_tickets: int = event.get("number_of_tickets", 10)
     platform: PlatformEnum = PlatformEnum(event.get("platform", "JIRA"))
+    generation_datetime: str = event.get("generation_datetime")
 
     if not document_id:
         raise ValueError("s3_key is required")
 
+    logger.info("Downloading transcript from S3...")
     transcript: str = download_file_from_s3(document_id)
+    logger.info("Transcript downloaded")
+    logger.debug(transcript)
 
     if not transcript:
         raise ValueError("Transcript not found")
@@ -212,22 +231,26 @@ def ticket_generation_handler(event, context):
         completion: ChatCompletionMessage = client.create_tickets(
             prompt=transcript,
             number_of_tickets=number_of_tickets,
-            platform=platform.value
+            platform=platform
         )
 
         tickets_dict: dict = json.loads(completion.content)
 
         logger.info("Tickets generated from transcript")
-        modified_tickets = modify_keys(tickets_dict)
+        modified_tickets: dict = modify_keys(tickets_dict)
+        logger.info(f"Modified tickets: {modified_tickets}")
 
-        for ticket in modified_tickets:
+        logger.info("Saving tickets to DynamoDB...")
+        for ticket in modified_tickets.get("tickets", []):
             ticket_model: TicketModel = TicketModel.initialize(
+                created_datetime=generation_datetime,
                 document_id=document_id,
                 subject=ticket.get("subject"),
                 body=ticket.get("body"),
-                estimation_points=ticket.get("estimation_points"),
+                estimation_points=str(ticket.get("estimationpoints")),
             )
             ticket_model.save()
+        logger.info("Tickets saved to DynamoDB")
     except Exception as e:
         logger.error(e)
         raise e("Error generating tickets from transcript. Please try again.")

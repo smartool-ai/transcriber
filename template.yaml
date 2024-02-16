@@ -47,6 +47,7 @@ Resources:
     Properties:
       Timeout: 60
       PackageType: Image
+      FunctionName: !Sub TRANSCRIBER-LAMBDA-${StageName}
       Environment:
         Variables:
           REGION_NAME: !FindInMap [EnvMappings, !Ref StageName, REGION]

@@ -32,4 +32,4 @@ COPY . ${LAMBDA_TASK_ROOT}
 
 ENV PYTHONPATH=${PYTHONPATH}:/${LAMBDA_TASK_ROOT}/application
 
-CMD [ "transcriber.handler" ]
+CMD [ "transcriber.ticket_generation_handler" ]
