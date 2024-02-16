@@ -156,7 +156,7 @@ class OpenAIClient(OpenAI):
         params: dict = {
             "model": "gpt-4-turbo-preview",
             "messages": [{"role": "user", "content": ticket_prompt}],
-            "max_tokens": 1024,
+            "max_tokens": 4096,
             "response_format": {"type": "json_object"},
         }
         if kwargs:
