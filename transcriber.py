@@ -12,6 +12,7 @@ from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from pynamodb.attributes import (
     ListAttribute,
     MapAttribute,
+    NumberAttribute,
     UnicodeAttribute,
     UTCDateTimeAttribute,
 )
@@ -53,13 +54,13 @@ class BaseModel(Model):
 class TicketModel(MapAttribute):
     subject = UnicodeAttribute()
     body = UnicodeAttribute()
-    estimation_points = UnicodeAttribute()
+    estimationpoints = NumberAttribute()
 
     def to_serializable_dict(self) -> dict:
         return {
             "subject": self.subject,
             "body": self.body,
-            "estimation_points": self.estimation_points,
+            "estimationpoints": self.estimationpoints,
         }
 
 
@@ -132,7 +133,7 @@ class OpenAIClient(OpenAI):
         "Given the following transcript from a video call, please create {n} {platform} tickets with the following information in json format:\n\n \
         1. Subject: [Enter the subject of the ticket here]\n \
         2. Body: [Enter the detailed description of the ticket here]\n \
-        3. Estimation Points: [Enter the estimation points for the ticket here]\n\n \
+        3. EstimationPoints: [Enter the estimation points for the ticket here]\n\n \
         Please note that the subject should be a brief summary of the ticket, the body should contain a detailed description of the work to be done, and the estimation points should be an integer representing the estimated effort required to complete the ticket."
     )
 
