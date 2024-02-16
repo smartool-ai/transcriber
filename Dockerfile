@@ -1,10 +1,7 @@
 # syntax=docker/dockerfile:1.2
-FROM public.ecr.aws/lambda/python:3.12
+FROM public.ecr.aws/lambda/python:3.11
 
 SHELL ["/bin/bash", "-c"]
-
-# RUN apt-get install curl \
-#     && apt-get install autoremove
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

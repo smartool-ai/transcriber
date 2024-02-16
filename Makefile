@@ -20,4 +20,5 @@ sam-deploy-dev:
 		--template-file packaged.yaml \
 		--stack-name TRANSCRIBER-LAMBDA-DEV \
 		--capabilities CAPABILITY_IAM --parameter-overrides StageName=${STAGE_NAME} \
+		AccountId=${DEV_AWS_ACCOUNT_ID} \
 		OpenaiApiKey=${OPENAI_API_KEY}

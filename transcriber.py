@@ -194,14 +194,14 @@ def modify_keys(data: dict) -> dict:
 
 def ticket_generation_handler(event, context):
     """Lambda handler for generating tickets from a transcript"""
-    s3_key: str = event.get("s3_key")
+    document_id: str = event.get("document_id")
     number_of_tickets: int = event.get("number_of_tickets", 10)
     platform: PlatformEnum = PlatformEnum(event.get("platform", "JIRA"))
 
-    if not s3_key:
+    if not document_id:
         raise ValueError("s3_key is required")
 
-    transcript: str = download_file_from_s3(s3_key)
+    transcript: str = download_file_from_s3(document_id)
 
     if not transcript:
         raise ValueError("Transcript not found")
@@ -221,8 +221,8 @@ def ticket_generation_handler(event, context):
         modified_tickets = modify_keys(tickets_dict)
 
         for ticket in modified_tickets:
-            ticket_model = TicketModel.initialize(
-                document_id=s3_key,
+            ticket_model: TicketModel = TicketModel.initialize(
+                document_id=document_id,
                 subject=ticket.get("subject"),
                 body=ticket.get("body"),
                 estimation_points=ticket.get("estimation_points"),
