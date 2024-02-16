@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: Transcriber
+    Description: Transcriber lambda for longer running ticket generation
+    Author: Jake Pifer
+    SemanticVersion: 0.1.0
+
+Globals:
+  Function:
+    Timeout: 10
+Parameters:
+  StageName:
+    Type: String
+    Default: local
+    AllowedValues:
+      - local
+      - dev
+      - prod
+  AccountId:
+    Type: String
+    Default: testing
+  OpenaiApiKey:
+    Type: String
+    Default: testId
+
+Mappings:
+  EnvMappings:
+    local:
+      tagenv: local
+      env: local
+      REGION: us-west-2
+    dev:
+      tagenv: development
+      env: development
+      REGION: us-west-2
+    prod:
+      tagenv: production
+      env: prod
+      REGION: us-west-2
+
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 60
+      PackageType: Image
+      Environment:
+        Variables:
+          REGION_NAME: !FindInMap [EnvMappings, !Ref StageName, REGION]
+          OPENAI_API_KEY: !Ref OpenaiApiKey
+      Role: !Join
+        - ""
+        - - "arn:aws:iam::"
+          - !Ref AccountId
+          - ":role/DynamoDatabasesAccessRole"
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AWSLambdaVPCAccessExecutionRole
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+              Resource:
+                - Fn::Sub:
+                  - "arn:aws:s3:::${Bucket}/*"
+                  - Bucket: !FindInMap [EnvMappings, !Ref StageName, transcriptions-ai]
+    Metadata:
+      DockerTag: latest
+      DockerContext: ./
+      Dockerfile: Dockerfile
