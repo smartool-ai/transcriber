@@ -17,7 +17,7 @@ logger = getLogger()
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 s3 = boto3.resource("s3", region_name=AWS_REGION)
-bucket = s3.Bucket(os.environ.get("ARTIST_IMAGES_BUCKET", "transcriptions-ai"))
+bucket = s3.Bucket(os.environ.get("ARTIST_IMAGES_BUCKET", "dev-transcriptions-ai"))
 client = OpenAIClient()
 
 
