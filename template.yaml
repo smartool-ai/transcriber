@@ -69,7 +69,7 @@ Resources:
               Resource:
                 - Fn::Sub:
                   - "arn:aws:s3:::${Bucket}/*"
-                  - Bucket: !FindInMap [EnvMappings, !Ref StageName, transcriptions-ai]
+                  - Bucket: !FindInMap [EnvMappings, !Ref StageName, dev-transcriptions-ai]
     Metadata:
       DockerTag: latest
       DockerContext: ./
