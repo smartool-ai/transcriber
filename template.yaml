@@ -45,7 +45,7 @@ Resources:
   Function:
     Type: AWS::Serverless::Function
     Properties:
-      Timeout: 60
+      Timeout: 120
       PackageType: Image
       FunctionName: !Sub TRANSCRIBER-LAMBDA-${StageName}
       Environment:

@@ -60,6 +60,7 @@ class OpenAIClient(OpenAI):
         if kwargs:
             params.update(kwargs)
 
+        logger.info(f"Generating completion with the following parameters: {params}")
         response = self.chat.completions.create(**params)
         logger.info(response)
         return response.choices[0].message
@@ -78,6 +79,7 @@ class OpenAIClient(OpenAI):
             + prompt  # noqa
         )
 
+        logger.info(f"Creating {number_of_tickets} tickets...")
         response: ChatCompletionMessage = self._generate(ticket_prompt, **kwargs)
         logger.info(response)
         return ticket_prompt, response
