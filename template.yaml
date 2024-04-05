@@ -52,6 +52,13 @@ Resources:
         Variables:
           REGION_NAME: !FindInMap [EnvMappings, !Ref StageName, REGION]
           OPENAI_API_KEY: !Ref OpenaiApiKey
+      Events:
+        KeepWarm:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Enabled: true
+            Input: {"body": "warm"}
       Role: !Join
         - ""
         - - "arn:aws:iam::"
