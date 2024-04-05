@@ -70,7 +70,11 @@ def modify_keys(data: dict) -> dict:
 
 def ticket_generation_handler(event, _):
     """Lambda handler for generating tickets from a transcript"""
+    if event.get("body", "invoke") == "warm":
+        logger.debug("Warm event received")
+        return
     logger.info("Received event: " + json.dumps(event, indent=2))
+
     event_type = EventEnum(event.get("event", "TICKET_GENERATION"))
     generation_datetime: str = event.get("generation_datetime")
     number_of_tickets: int = event.get("number_of_tickets", 10)
