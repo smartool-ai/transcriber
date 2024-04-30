@@ -1,6 +1,11 @@
 import enum
 
 
+class ClientEnum(str, enum.Enum):
+    OPENAI = "OPENAI"
+    ANTHROPIC = "ANTHROPIC"
+
+
 class PlatformEnum(str, enum.Enum):
     """Enum for the platform of the ticket."""
 

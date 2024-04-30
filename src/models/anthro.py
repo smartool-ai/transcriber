@@ -43,7 +43,7 @@ class AnthropicClient(Anthropic):
         self.max_tokens = max_tokens
         super().__init__(api_key=os.getenv("ANTHROPIC_API_KEY", "test"))
 
-    def _generate(self, prompt: str, **kwargs) -> Message:
+    def _generate(self, prompt: str, **kwargs) -> str:
         """
         Generate a completion based on the given prompt.
 
@@ -54,7 +54,7 @@ class AnthropicClient(Anthropic):
             Message: The completion message.
         """
         params: dict = {
-            "model": "claude-3-sonnet-20240229",
+            "model": "claude-3-opus-20240229",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": self.max_tokens,
         }
@@ -73,7 +73,7 @@ class AnthropicClient(Anthropic):
         platform: Optional[PlatformEnum] = PlatformEnum.JIRA,
         response_format: Optional[str] = "{'tickets': [{'Subject': 'Create a new feature', 'Body': 'Create a new feature that allows users to upload images', 'EstimationPoints': 5}, {'Subject': 'Update the homepage', 'Body': 'Update the homepage to include a new banner', 'EstimationPoints': 3}]}",
         **kwargs,
-    ) -> Tuple[str, Message]:
+    ) -> Tuple[str, dict]:
         ticket_prompt: str = (
             self.ticket_prompt_prefix.format(
                 n=number_of_tickets, platform=platform.value, response=response_format
@@ -82,9 +82,9 @@ class AnthropicClient(Anthropic):
         )
 
         logger.info(f"Creating {number_of_tickets} tickets...")
-        response: Message = self._generate(ticket_prompt, **kwargs)
+        response: str = self._generate(ticket_prompt, **kwargs)
         logger.info(response)
-        return ticket_prompt, response
+        return ticket_prompt, eval(response)
 
     def expand_ticket(self, original_prompt: str, ticket: dict, amount_of_sub_tickets: int = 3) -> Tuple[str, dict]:
         """
@@ -103,4 +103,4 @@ class AnthropicClient(Anthropic):
 
         response: dict = self._generate(prompt)
         logger.info(response)
-        return prompt, response
+        return prompt, eval(response)

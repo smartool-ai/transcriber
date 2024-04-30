@@ -4,7 +4,8 @@ import os
 from logging import getLogger
 from typing import Optional
 
-from src.lib.enums import PlatformEnum, EventEnum
+from src.lib.enums import ClientEnum, PlatformEnum, EventEnum
+from src.models.client import AiClient
 from src.models.openai import OpenAIClient
 from src.models.dynamo.ticket import SubTicket, TicketModel
 
@@ -18,7 +19,6 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 s3 = boto3.resource("s3", region_name=AWS_REGION)
 bucket = s3.Bucket(os.environ.get("ARTIST_IMAGES_BUCKET", "dev-transcriptions-ai"))
-client = OpenAIClient()
 
 
 def download_file_from_s3(s3_key) -> Optional[str]:
@@ -79,6 +79,9 @@ def ticket_generation_handler(event, _):
     generation_datetime: str = event.get("generation_datetime")
     number_of_tickets: int = event.get("number_of_tickets", 10)
     document_id: str = event.get("document_id")
+    client_str: str = event.get("client", "OPENAI")
+
+    client: AiClient = AiClient(ClientEnum(client_str))
 
     match event_type:
         case EventEnum.TICKET_GENERATION:
